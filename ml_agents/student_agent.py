@@ -21,17 +21,17 @@ def get_student_opportunities(category: str) -> List[Dict]:
     """
     if category not in CATEGORY_FUNCTIONS:
         raise ValueError(f"Unknown category: {category}")
-    
-    # Check cache first
+
+    # Check in-memory cache first
     if category in _opportunity_cache:
         logger.info(f"Returning cached results for {category}")
         return _opportunity_cache[category]
-    
-    # Fetch new results
+
+    # Fetch new results (this will check file cache internally)
     logger.info(f"Fetching new results for {category}")
     results = CATEGORY_FUNCTIONS[category]()
-    
-    # Update cache
+
+    # Update in-memory cache
     _opportunity_cache[category] = results
-    
-    return results 
+
+    return results
