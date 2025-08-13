@@ -1,10 +1,11 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { Eye, EyeOff, Mail, Lock, ArrowRight, Sparkles } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
+import { testFirebaseConnection } from '../../utils/firebaseTest';
 
 const Login = () => {
-  const { login, error, setError, userProfile } = useAuth();
+  const { login, error, setError, getDashboardUrl } = useAuth();
   const [formData, setFormData] = useState({
     email: '',
     password: ''
@@ -12,7 +13,17 @@ const Login = () => {
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [errors, setErrors] = useState({});
+  const [connectionStatus, setConnectionStatus] = useState('checking');
   const navigate = useNavigate();
+
+  // Test Firebase connection on component mount
+  useEffect(() => {
+    const testConnection = async () => {
+      const isConnected = await testFirebaseConnection();
+      setConnectionStatus(isConnected ? 'connected' : 'disconnected');
+    };
+    testConnection();
+  }, []);
 
   const handleInputChange = (e) => {
     const { name, value } = e.target;
@@ -57,16 +68,25 @@ const Login = () => {
     setError('');
 
     try {
-      await login(formData.email, formData.password);
-
-      // Wait a moment for userProfile to be set
-      setTimeout(() => {
-        if (userProfile?.role === 'Student') {
-          navigate('/dashboard/student');
-        } else {
-          navigate('/dashboard/other');
+      // Test connection before login
+      if (connectionStatus === 'disconnected') {
+        const isConnected = await testFirebaseConnection();
+        if (!isConnected) {
+          setError('Unable to connect to database. Please check your internet connection and try again.');
+          return;
         }
-      }, 100);
+      }
+
+      const { user, profile } = await login(formData.email, formData.password);
+
+      // Navigate based on role using the utility function
+      if (profile && profile.role) {
+        const dashboardUrl = getDashboardUrl(profile.role);
+        navigate(dashboardUrl);
+      } else {
+        // Fallback to student dashboard if no role is found
+        navigate('/dashboard/student');
+      }
     } catch (error) {
       console.error('Login error:', error);
       // Error is handled by AuthContext

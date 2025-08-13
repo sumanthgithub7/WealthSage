@@ -113,7 +113,7 @@ const StudentDashboard = () => {
   };
 
   const getFirstName = () => {
-    return userProfile?.firstName || userProfile?.displayName?.split(' ')[0] || 'Student';
+    return userProfile?.firstName || userProfile?.displayName?.split(' ')[0] || 'Demo Student';
   };
 
   if (loading) {
@@ -167,10 +167,10 @@ const StudentDashboard = () => {
               </div>
               
               <button
-                onClick={logout}
+                onClick={() => logout ? logout() : window.location.href = '/'}
                 className="text-red-600 hover:text-red-700 font-medium text-sm transition-colors duration-200"
               >
-                Logout
+                {logout ? 'Logout' : 'Back to Home'}
               </button>
             </div>
           </div>

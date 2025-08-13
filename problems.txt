@@ -1,0 +1,5 @@
+
+problems
+  -login is very slow
+  -add an extra file and local db for storing passwrd aand otehr stuff
+  -change the ui with realisitic once 

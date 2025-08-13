@@ -4,7 +4,7 @@ import { Eye, EyeOff, Mail, Lock, User, ArrowRight, Sparkles, GraduationCap, Bri
 import { useAuth } from '../../context/AuthContext';
 
 const Signup = () => {
-  const { signup, error, setError } = useAuth();
+  const { signup, error, setError, getDashboardUrl } = useAuth();
   const [formData, setFormData] = useState({
     firstName: '',
     lastName: '',
@@ -21,10 +21,10 @@ const Signup = () => {
   const navigate = useNavigate();
 
   const roles = [
-    { id: 'Student', label: 'Student', icon: GraduationCap, description: 'Access income opportunities, budgeting tools, and financial education' },
-    { id: 'Professional', label: 'Professional', icon: Briefcase, description: 'Advanced investment tracking and career-focused financial planning' },
-    { id: 'Homemaker', label: 'Homemaker', icon: Home, description: 'Family budgeting, savings goals, and household financial management' },
-    { id: 'Elderly', label: 'Elderly', icon: Users, description: 'Retirement planning, healthcare budgeting, and legacy planning' }
+    { id: 'student', label: 'Student', icon: GraduationCap, description: 'Access income opportunities, budgeting tools, and financial education' },
+    { id: 'professional', label: 'Professional', icon: Briefcase, description: 'Advanced investment tracking and career-focused financial planning' },
+    { id: 'homemaker', label: 'Homemaker', icon: Home, description: 'Family budgeting, savings goals, and household financial management' },
+    { id: 'elderly', label: 'Elderly', icon: Users, description: 'Retirement planning, healthcare budgeting, and legacy planning' }
   ];
 
   const handleInputChange = (e) => {
@@ -100,12 +100,9 @@ const Signup = () => {
         formData.role
       );
 
-      // Navigate based on role
-      if (formData.role === 'Student') {
-        navigate('/dashboard/student');
-      } else {
-        navigate('/dashboard/other');
-      }
+      // Navigate based on role using the utility function
+      const dashboardUrl = getDashboardUrl(formData.role);
+      navigate(dashboardUrl);
     } catch (error) {
       console.error('Signup error:', error);
       // Error is handled by AuthContext

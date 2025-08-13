@@ -1,0 +1,4 @@
+what to do next:
+  -update all the plaforms with same type of design
+  -ml agents for stock and others
+

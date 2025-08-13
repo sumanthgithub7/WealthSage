@@ -2,11 +2,15 @@ import React, { Suspense, lazy } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider } from './context/AuthContext';
 import ProtectedRoute from './components/ProtectedRoute';
+import RoleBasedRedirect from './components/RoleBasedRedirect';
 import './style.css';
 
 // Lazy load pages for better performance
 const LandingPage = lazy(() => import('./pages/LandingPage'));
 const StudentDashboard = lazy(() => import('./pages/StudentDashboard'));
+const ProfessionalDashboard = lazy(() => import('./pages/ProfessionalDashboard'));
+const HomemakerDashboard = lazy(() => import('./pages/HomemakerDashboard'));
+const ElderlyDashboard = lazy(() => import('./pages/ElderlyDashboard'));
 const OtherRolesDashboard = lazy(() => import('./pages/OtherRolesDashboard'));
 
 // Auth pages
@@ -37,19 +41,60 @@ function App() {
           <Suspense fallback={<PageLoader />}>
             <Routes>
               {/* Public Routes */}
-              <Route path="/" element={<LandingPage />} />
+              <Route path="/" element={
+                <RoleBasedRedirect>
+                  <LandingPage />
+                </RoleBasedRedirect>
+              } />
               <Route path="/auth/login" element={<Login />} />
               <Route path="/auth/signup" element={<Signup />} />
               <Route path="/auth/forgot-password" element={<ForgotPassword />} />
 
-              {/* Protected Routes - Student Dashboard */}
+              {/* Demo Routes - No Authentication Required */}
+              <Route path="/demo/student" element={<StudentDashboard />} />
+              <Route path="/demo/professional" element={<ProfessionalDashboard />} />
+              <Route path="/demo/homemaker" element={<HomemakerDashboard />} />
+              <Route path="/demo/elderly" element={<ElderlyDashboard />} />
+              <Route path="/demo/other" element={<OtherRolesDashboard />} />
+
+              {/* Protected Routes - Role-Based Dashboards */}
               <Route path="/dashboard/student" element={
                 <ProtectedRoute>
                   <StudentDashboard />
                 </ProtectedRoute>
               } />
 
-              {/* Protected Routes - Other Roles Dashboard */}
+              <Route path="/dashboard/professional" element={
+                <ProtectedRoute>
+                  <ProfessionalDashboard />
+                </ProtectedRoute>
+              } />
+
+              <Route path="/dashboard/homemaker" element={
+                <ProtectedRoute>
+                  <HomemakerDashboard />
+                </ProtectedRoute>
+              } />
+
+              <Route path="/dashboard/elderly" element={
+                <ProtectedRoute>
+                  <ElderlyDashboard />
+                </ProtectedRoute>
+              } />
+
+              <Route path="/dashboard/elder" element={
+                <ProtectedRoute>
+                  <ElderlyDashboard />
+                </ProtectedRoute>
+              } />
+
+              <Route path="/dashboard/adult" element={
+                <ProtectedRoute>
+                  <ProfessionalDashboard />
+                </ProtectedRoute>
+              } />
+
+              {/* Fallback for other roles */}
               <Route path="/dashboard/other" element={
                 <ProtectedRoute>
                   <OtherRolesDashboard />

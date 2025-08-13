@@ -4,9 +4,10 @@ import {
   signInWithEmailAndPassword, 
   signOut, 
   onAuthStateChanged,
-  updateProfile
+  updateProfile,
+  sendPasswordResetEmail
 } from 'firebase/auth';
-import { doc, setDoc, getDoc } from 'firebase/firestore';
+import { doc, setDoc, getDoc, enableNetwork, disableNetwork } from 'firebase/firestore';
 import { auth, db } from '../config/firebase';
 
 const AuthContext = createContext();
@@ -14,6 +15,52 @@ const AuthContext = createContext();
 export function useAuth() {
   return useContext(AuthContext);
 }
+
+// Utility function to get dashboard URL based on role
+export const getDashboardUrl = (role) => {
+  if (!role) return '/dashboard/student'; // default fallback
+  
+  // Convert role to lowercase for URL mapping
+  const roleLower = role.toLowerCase();
+  
+  // Map roles to dashboard URLs
+  const roleMap = {
+    'student': '/dashboard/student',
+    'professional': '/dashboard/professional', 
+    'homemaker': '/dashboard/homemaker',
+    'elderly': '/dashboard/elderly',
+    'adult': '/dashboard/adult',
+    'elder': '/dashboard/elder'
+  };
+  
+  return roleMap[roleLower] || '/dashboard/student';
+};
+
+// Helper function to fetch user profile with retry logic
+const fetchUserProfile = async (uid, retries = 3) => {
+  for (let i = 0; i < retries; i++) {
+    try {
+      // Enable network connection
+      await enableNetwork(db);
+      
+      const userDoc = await getDoc(doc(db, 'users', uid));
+      if (userDoc.exists()) {
+        return userDoc.data();
+      }
+      return null;
+    } catch (error) {
+      console.error(`Attempt ${i + 1} failed to fetch user profile:`, error);
+      
+      if (i === retries - 1) {
+        // Last attempt failed, throw error
+        throw error;
+      }
+      
+      // Wait before retrying
+      await new Promise(resolve => setTimeout(resolve, 1000 * (i + 1)));
+    }
+  }
+};
 
 export function AuthProvider({ children }) {
   const [currentUser, setCurrentUser] = useState(null);
@@ -47,8 +94,14 @@ export function AuthProvider({ children }) {
         updatedAt: new Date().toISOString()
       };
 
-      await setDoc(doc(db, 'users', user.uid), userProfile);
-      setUserProfile(userProfile);
+      try {
+        await setDoc(doc(db, 'users', user.uid), userProfile);
+        setUserProfile(userProfile);
+      } catch (firestoreError) {
+        console.error('Firestore error during signup:', firestoreError);
+        // Don't fail signup if Firestore is down, user can still sign in
+        // Profile will be created when they next sign in
+      }
       
       return user;
     } catch (error) {
@@ -84,13 +137,16 @@ export function AuthProvider({ children }) {
       
       const { user } = await signInWithEmailAndPassword(auth, email, password);
       
-      // Fetch user profile from Firestore
-      const userDoc = await getDoc(doc(db, 'users', user.uid));
-      if (userDoc.exists()) {
-        setUserProfile(userDoc.data());
+      // Fetch user profile from Firestore with retry logic
+      try {
+        const profileData = await fetchUserProfile(user.uid);
+        setUserProfile(profileData);
+        return { user, profile: profileData };
+      } catch (firestoreError) {
+        console.error('Failed to fetch user profile:', firestoreError);
+        // Continue with login even if profile fetch fails
+        return { user, profile: null };
       }
-      
-      return user;
     } catch (error) {
       console.error('Login error:', error);
       let errorMessage = 'Failed to log in';
@@ -161,14 +217,13 @@ export function AuthProvider({ children }) {
       if (user) {
         setCurrentUser(user);
         
-        // Fetch user profile from Firestore
+        // Fetch user profile from Firestore with retry logic
         try {
-          const userDoc = await getDoc(doc(db, 'users', user.uid));
-          if (userDoc.exists()) {
-            setUserProfile(userDoc.data());
-          }
+          const profileData = await fetchUserProfile(user.uid);
+          setUserProfile(profileData);
         } catch (error) {
           console.error('Error fetching user profile:', error);
+          // Don't fail auth state change if profile fetch fails
         }
       } else {
         setCurrentUser(null);
@@ -189,7 +244,8 @@ export function AuthProvider({ children }) {
     resetPassword,
     loading,
     error,
-    setError
+    setError,
+    getDashboardUrl
   };
 
   return (
