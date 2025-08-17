@@ -2,4 +2,11 @@ fastapi
 uvicorn
 requests
 pydantic
-python-dotenv 
+python-dotenv==1.0.0
+openpyxl==3.1.2
+mysqlclient==2.1.1
+psycopg2-binary==2.9.7
+flask==2.3.3
+flask-sqlalchemy==3.0.5
+flask-cors==4.0.0
+firebase-admin==6.2.0 

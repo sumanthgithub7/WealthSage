@@ -5,10 +5,11 @@ import {
   signOut, 
   onAuthStateChanged,
   updateProfile,
-  sendPasswordResetEmail
+  sendPasswordResetEmail,
+  signInWithPopup
 } from 'firebase/auth';
 import { doc, setDoc, getDoc, enableNetwork, disableNetwork } from 'firebase/firestore';
-import { auth, db } from '../config/firebase';
+import { auth, db, googleProvider } from '../config/firebase';
 
 const AuthContext = createContext();
 
@@ -42,7 +43,7 @@ const fetchUserProfile = async (uid, retries = 3) => {
     try {
       // Enable network connection
       await enableNetwork(db);
-      
+
       const userDoc = await getDoc(doc(db, 'users', uid));
       if (userDoc.exists()) {
         return userDoc.data();
@@ -50,23 +51,117 @@ const fetchUserProfile = async (uid, retries = 3) => {
       return null;
     } catch (error) {
       console.error(`Attempt ${i + 1} failed to fetch user profile:`, error);
-      
-      if (i === retries - 1) {
-        // Last attempt failed, throw error
-        throw error;
+
+      // Check if it's a 400 error (Firestore security rules issue)
+      if (error.code === 'permission-denied' || error.message.includes('400')) {
+        console.warn('Firestore access denied - this might be due to security rules');
+        // Return null instead of throwing - let the app continue
+        return null;
       }
-      
+
+      if (i === retries - 1) {
+        // Last attempt failed, but don't throw for Firestore issues
+        console.warn('Failed to fetch user profile after retries, continuing without profile');
+        return null;
+      }
+
       // Wait before retrying
       await new Promise(resolve => setTimeout(resolve, 1000 * (i + 1)));
     }
   }
 };
 
+// Backend API URL
+const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+
 export function AuthProvider({ children }) {
   const [currentUser, setCurrentUser] = useState(null);
   const [userProfile, setUserProfile] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+
+  // Google Auth function
+  async function signInWithGoogle(role = 'user') {
+    try {
+      setError('');
+      setLoading(true);
+      
+      // Sign in with Google
+      const result = await signInWithPopup(auth, googleProvider);
+      const user = result.user;
+      
+      // Get ID token for backend verification
+      const idToken = await user.getIdToken();
+      
+      // Send to backend for dual database storage
+      const response = await fetch(`${API_BASE_URL}/api/auth/google`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          idToken: idToken,
+          role: role
+        })
+      });
+      
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to authenticate with backend');
+      }
+      
+      const data = await response.json();
+      
+      // Store user profile in Firestore
+      const userProfile = {
+        uid: user.uid,
+        email: user.email,
+        firstName: user.displayName?.split(' ')[0] || '',
+        lastName: user.displayName?.split(' ').slice(1).join(' ') || '',
+        displayName: user.displayName,
+        role: role,
+        photoURL: user.photoURL,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString()
+      };
+
+      try {
+        await setDoc(doc(db, 'users', user.uid), userProfile);
+        setUserProfile(userProfile);
+        console.log('User profile stored in Firestore');
+      } catch (firestoreError) {
+        console.error('Firestore error during Google signup:', firestoreError);
+        // Don't fail signup if Firestore is down - user can still sign in
+        // Profile will be created when they next sign in or when Firestore is available
+        console.warn('Continuing with signup despite Firestore error');
+      }
+      
+      return { user, profile: userProfile, isNewUser: data.isNewUser };
+      
+    } catch (error) {
+      console.error('Google Auth error:', error);
+      let errorMessage = 'Failed to sign in with Google';
+      
+      switch (error.code) {
+        case 'auth/popup-closed-by-user':
+          errorMessage = 'Sign in was cancelled';
+          break;
+        case 'auth/popup-blocked':
+          errorMessage = 'Sign in popup was blocked. Please allow popups for this site';
+          break;
+        case 'auth/account-exists-with-different-credential':
+          errorMessage = 'An account already exists with the same email address but different sign-in credentials';
+          break;
+        default:
+          errorMessage = error.message;
+      }
+      
+      setError(errorMessage);
+      throw new Error(errorMessage);
+    } finally {
+      setLoading(false);
+    }
+  }
 
   // Sign up function
   async function signup(email, password, firstName, lastName, role) {
@@ -187,7 +282,44 @@ export function AuthProvider({ children }) {
     }
   }
 
-  // Reset password function
+  // Forgot Password function
+  async function forgotPassword(email) {
+    try {
+      setError('');
+      setLoading(true);
+
+      // Send password reset email using Firebase
+      await sendPasswordResetEmail(auth, email);
+
+      console.log('Password reset email sent to:', email);
+      return { success: true, message: 'Password reset email sent successfully!' };
+
+    } catch (error) {
+      console.error('Forgot password error:', error);
+      let errorMessage = 'Failed to send password reset email';
+
+      switch (error.code) {
+        case 'auth/user-not-found':
+          errorMessage = 'No account found with this email address';
+          break;
+        case 'auth/invalid-email':
+          errorMessage = 'Please enter a valid email address';
+          break;
+        case 'auth/too-many-requests':
+          errorMessage = 'Too many requests. Please try again later';
+          break;
+        default:
+          errorMessage = error.message;
+      }
+
+      setError(errorMessage);
+      throw new Error(errorMessage);
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  // Reset password function (existing - unchanged)
   async function resetPassword(email) {
     try {
       setError('');
@@ -195,7 +327,7 @@ export function AuthProvider({ children }) {
     } catch (error) {
       console.error('Reset password error:', error);
       let errorMessage = 'Failed to reset password';
-      
+
       switch (error.code) {
         case 'auth/user-not-found':
           errorMessage = 'No account found with this email address';
@@ -206,7 +338,7 @@ export function AuthProvider({ children }) {
         default:
           errorMessage = error.message;
       }
-      
+
       setError(errorMessage);
       throw new Error(errorMessage);
     }
@@ -242,10 +374,12 @@ export function AuthProvider({ children }) {
     login,
     logout,
     resetPassword,
+    signInWithGoogle,
     loading,
     error,
     setError,
-    getDashboardUrl
+    getDashboardUrl,
+    forgotPassword
   };
 
   return (
