@@ -17,6 +17,8 @@ const OtherRolesDashboard = lazy(() => import('./pages/OtherRolesDashboard'));
 const Login = lazy(() => import('./pages/auth/Login'));
 const Signup = lazy(() => import('./pages/auth/Signup'));
 const ForgotPassword = lazy(() => import('./pages/auth/ForgotPassword'));
+const TestAuth = lazy(() => import('./pages/TestAuth'));
+const AdminPanel = lazy(() => import('./pages/AdminPanel'));
 
 // Loading component
 const PageLoader = () => (
@@ -49,6 +51,8 @@ function App() {
               <Route path="/auth/login" element={<Login />} />
               <Route path="/auth/signup" element={<Signup />} />
               <Route path="/auth/forgot-password" element={<ForgotPassword />} />
+              <Route path="/test-auth" element={<TestAuth />} />
+              <Route path="/admin" element={<AdminPanel />} />
 
               {/* Demo Routes - No Authentication Required */}
               <Route path="/demo/student" element={<StudentDashboard />} />

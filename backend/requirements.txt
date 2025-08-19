@@ -1,8 +1,10 @@
 fastapi
-uvicorn
+uvicorn[standard]
 requests
-pydantic
-python-dotenv==1.0.0
+pydantic[email]
+python-dotenv
+openpyxl
+pandas==1.0.0
 openpyxl==3.1.2
 mysqlclient==2.1.1
 psycopg2-binary==2.9.7
